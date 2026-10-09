@@ -1,0 +1,6 @@
+{
+  "name": "Astha Study AI - Smart Chapter Study",
+  "description": "AI-powered mobile-first PWA for Class 6-10 students with strict Source Lock chapter learning, notes, question generator, and interactive quizzes in Hindi and English.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

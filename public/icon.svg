@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background Gradient -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="35%" stop-color="#312e81" />
+      <stop offset="70%" stop-color="#4338ca" />
+      <stop offset="100%" stop-color="#2563eb" />
+    </linearGradient>
+
+    <!-- Golden Sparkle Gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="45%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+
+    <!-- Cyan/Light AI Glow -->
+    <linearGradient id="aiGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a5f3fc" />
+      <stop offset="60%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+
+    <!-- Page Shadow -->
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#0f172a" flood-opacity="0.5" />
+    </filter>
+
+    <filter id="sparkleGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Squircle Base for App Icon -->
+  <rect width="512" height="512" rx="118" fill="url(#bgGrad)" />
+
+  <!-- Outer Knowledge Halo -->
+  <circle cx="256" cy="240" r="186" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-dasharray="12 8" opacity="0.35" />
+  <circle cx="256" cy="240" r="162" fill="white" fill-opacity="0.04" />
+
+  <!-- Floating Glow Orbs -->
+  <circle cx="130" cy="140" r="4" fill="#fde047" opacity="0.8" />
+  <circle cx="380" cy="150" r="5" fill="#38bdf8" opacity="0.85" />
+  <circle cx="105" cy="290" r="3.5" fill="#93c5fd" opacity="0.6" />
+  <circle cx="410" cy="300" r="4" fill="#fbbf24" opacity="0.75" />
+
+  <!-- Open Book of Knowledge -->
+  <g filter="url(#cardShadow)">
+    <!-- Book Left Page Base -->
+    <path d="M 256 318 C 210 294 135 292 78 312 L 78 180 C 135 160 210 162 256 186 Z" fill="#e2e8f0" opacity="0.75" />
+    <!-- Book Right Page Base -->
+    <path d="M 256 318 C 302 294 377 292 434 312 L 434 180 C 377 160 302 162 256 186 Z" fill="#e2e8f0" opacity="0.75" />
+
+    <!-- Book Left Main Page -->
+    <path d="M 256 310 C 210 286 138 284 84 304 L 84 172 C 138 152 210 154 256 178 Z" fill="#ffffff" />
+    <!-- Book Right Main Page -->
+    <path d="M 256 310 C 302 286 374 284 428 304 L 428 172 C 374 152 302 154 256 178 Z" fill="#f8fafc" />
+
+    <!-- Page Text Lines Simulation Left -->
+    <line x1="112" y1="202" x2="228" y2="194" stroke="#cbd5e1" stroke-width="4.5" stroke-linecap="round" />
+    <line x1="112" y1="226" x2="228" y2="218" stroke="#cbd5e1" stroke-width="4.5" stroke-linecap="round" />
+    <line x1="112" y1="250" x2="190" y2="243" stroke="#cbd5e1" stroke-width="4.5" stroke-linecap="round" />
+
+    <!-- Page Text Lines Simulation Right -->
+    <line x1="284" y1="194" x2="400" y2="202" stroke="#93c5fd" stroke-width="4.5" stroke-linecap="round" opacity="0.8" />
+    <line x1="284" y1="218" x2="400" y2="226" stroke="#93c5fd" stroke-width="4.5" stroke-linecap="round" opacity="0.8" />
+    <line x1="284" y1="243" x2="350" y2="250" stroke="#f59e0b" stroke-width="4.5" stroke-linecap="round" opacity="0.9" />
+
+    <!-- Book Spine Glow Line -->
+    <line x1="256" y1="172" x2="256" y2="315" stroke="#4f46e5" stroke-width="6" stroke-linecap="round" />
+    
+    <!-- Golden Silk Bookmark Ribbon -->
+    <path d="M 250 168 L 262 168 L 262 238 L 256 230 L 250 238 Z" fill="url(#goldGrad)" />
+  </g>
+
+  <!-- Floating Graduation Cap Symbol -->
+  <g transform="translate(256, 118) scale(0.85)">
+    <!-- Mortarboard Diamond -->
+    <polygon points="0,-22 42,0 0,22 -42,0" fill="#38bdf8" opacity="0.95" />
+    <polygon points="0,-18 36,0 0,18 -36,0" fill="#0284c7" />
+    <!-- Tassel -->
+    <line x1="16" y1="8" x2="30" y2="22" stroke="#fde047" stroke-width="3" stroke-linecap="round" />
+    <circle cx="30" cy="23" r="3.5" fill="#fde047" />
+  </g>
+
+  <!-- Radiant AI Sparkle Star (Center-Top) -->
+  <g transform="translate(256, 126)" filter="url(#sparkleGlow)">
+    <!-- 8-Point Diamond Star -->
+    <path d="M 0 -36 Q 4 -10 24 0 Q 4 10 0 36 Q -4 10 -24 0 Q -4 -10 0 -36 Z" fill="url(#goldGrad)" />
+    <!-- Cross diagonal smaller star -->
+    <path d="M 0 -22 Q 3 -6 16 0 Q 3 6 0 22 Q -3 6 -16 0 Q -3 -6 0 -22 Z" transform="rotate(45)" fill="#ffffff" opacity="0.9" />
+    <!-- Glowing Center Core -->
+    <circle cx="0" cy="0" r="7" fill="#ffffff" />
+    <circle cx="0" cy="0" r="4" fill="#fef08a" />
+  </g>
+
+  <!-- Secondary Sparkle Right -->
+  <g transform="translate(348, 96) scale(0.65)" filter="url(#sparkleGlow)">
+    <path d="M 0 -28 Q 3 -8 18 0 Q 3 8 0 28 Q -3 8 -18 0 Q -3 -8 0 -28 Z" fill="#38bdf8" />
+    <circle cx="0" cy="0" r="5" fill="#ffffff" />
+  </g>
+
+  <!-- Secondary Sparkle Left -->
+  <g transform="translate(164, 106) scale(0.55)" filter="url(#sparkleGlow)">
+    <path d="M 0 -28 Q 3 -8 18 0 Q 3 8 0 28 Q -3 8 -18 0 Q -3 -8 0 -28 Z" fill="#fde047" />
+    <circle cx="0" cy="0" r="5" fill="#ffffff" />
+  </g>
+
+  <!-- Emblem Text Banner at Bottom -->
+  <g transform="translate(256, 396)">
+    <!-- Pill Backdrop -->
+    <rect x="-140" y="-22" width="280" height="44" rx="22" fill="#0f172a" fill-opacity="0.45" stroke="#818cf8" stroke-width="1.5" />
+    <!-- Hindi & English Branding -->
+    <text x="0" y="7" font-family="'Plus Jakarta Sans', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="21" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">
+      ASTHA STUDY AI
+    </text>
+  </g>
+
+  <!-- Subtitle Tagline in Devanagari -->
+  <text x="256" y="445" font-family="'Noto Sans Devanagari', 'Plus Jakarta Sans', sans-serif" font-weight="700" font-size="16" fill="#fde047" text-anchor="middle" letter-spacing="1">
+    स्मार्ट चैप्टर स्टडी
+  </text>
+</svg>
