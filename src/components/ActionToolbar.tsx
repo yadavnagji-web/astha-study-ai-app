@@ -1,7 +1,7 @@
 import React from 'react';
 import { ClassLevel } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
-import { Shield, Globe, GraduationCap, Share2, Home, BookOpen } from 'lucide-react';
+import { Shield, Globe, GraduationCap, Share2, Home, BookOpen, UploadCloud } from 'lucide-react';
 
 interface Props {
   currentClass: ClassLevel;
@@ -11,6 +11,7 @@ interface Props {
   onNavigate: (view: 'home' | 'chapters' | 'workspace' | 'admin') => void;
   currentView: string;
   onOpenShare: () => void;
+  onOpenUpload?: () => void;
 }
 
 export const ActionToolbar: React.FC<Props> = ({
@@ -21,6 +22,7 @@ export const ActionToolbar: React.FC<Props> = ({
   onNavigate,
   currentView,
   onOpenShare,
+  onOpenUpload,
 }) => {
   const isHindi = language === 'Hindi';
   const classOptions: { id: ClassLevel; label: string }[] = [
@@ -61,6 +63,18 @@ export const ActionToolbar: React.FC<Props> = ({
             <BookOpen className="w-3.5 h-3.5" />
             <span>{isHindi ? 'अध्याय' : 'Chapters'}</span>
           </button>
+
+          {/* Direct Upload Button (Always Accessible on every screen) */}
+          {onOpenUpload && (
+            <button
+              onClick={onOpenUpload}
+              className="rounded-xl px-2.5 py-1.5 text-xs font-extrabold transition cursor-pointer flex items-center gap-1 shrink-0 bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-xs active:scale-95"
+              title={isHindi ? 'नया अध्याय अपलोड करें' : 'Upload Chapter'}
+            >
+              <UploadCloud className="w-3.5 h-3.5 text-slate-950" />
+              <span>{isHindi ? '📤 अपलोड' : '📤 Upload'}</span>
+            </button>
+          )}
 
           {/* Class Selector Dropdown */}
           <div className="relative flex items-center shrink-0">

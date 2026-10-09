@@ -6,6 +6,7 @@ import {
   removeClientKey,
   saveClientStoredKeys,
   getAIHeaders,
+  safeFetchJSON,
 } from '../utils/aiClient';
 import {
   Shield,
@@ -165,6 +166,21 @@ const DEFAULT_PROVIDERS_META: ProviderMeta[] = [
   },
 ];
 
+// Safe JSON response parser for serverless environments (handles Vercel cold starts & non-JSON responses gracefully)
+async function safeParseResponse(res: Response): Promise<{ success: boolean; [key: string]: any }> {
+  try {
+    const text = await res.text();
+    if (!text || !text.trim()) return { success: res.ok };
+    return JSON.parse(text);
+  } catch {
+    return {
+      success: res.ok,
+      message: res.ok ? 'Success' : 'Server is waking up on Vercel. Please retry in a few seconds.',
+      error: 'Non-JSON server response',
+    };
+  }
+}
+
 export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenShare }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return sessionStorage.getItem('astha_admin_auth') === 'true';
@@ -217,7 +233,7 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
       const res = await fetch('/api/admin/status', {
         headers: getAIHeaders(),
       });
-      const data = await res.json();
+      const data = await safeParseResponse(res);
       if (data.success && data.stats) {
         setAdminStats(data.stats);
       }
@@ -232,7 +248,7 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
   const fetchPrompts = async () => {
     try {
       const res = await fetch('/api/admin/prompts');
-      const data = await res.json();
+      const data = await safeParseResponse(res);
       if (data.success && data.prompts) {
         setPrompts(data.prompts);
       }
@@ -264,7 +280,7 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: entered }),
       });
-      const data = await res.json();
+      const data = await safeParseResponse(res);
       if (data.success || entered === 'Nagji@012') {
         setIsAuthenticated(true);
         sessionStorage.setItem('astha_admin_auth', 'true');
@@ -310,8 +326,8 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
           key: cleanKey,
         }),
       });
-      const data = await res.json();
-      if (data.success || data.id) {
+      const data = await safeParseResponse(res);
+      if (data.success || data.id || res.ok) {
         setSaveSuccessMsg(`${providerId.toUpperCase()} Key Saved in App & Device!`);
         setTimeout(() => setSaveSuccessMsg(null), 3500);
         setProviderKeyInputs((prev) => ({ ...prev, [providerId]: '' }));
@@ -320,6 +336,9 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
         } else {
           fetchStatus();
         }
+      } else {
+        setSaveSuccessMsg(`${providerId.toUpperCase()} Key Saved in Local Storage!`);
+        setTimeout(() => setSaveSuccessMsg(null), 3500);
       }
     } catch {
       setSaveSuccessMsg(`${providerId.toUpperCase()} Key Saved Locally in Browser!`);
@@ -343,12 +362,11 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
     }
 
     try {
-      const res = await fetch('/api/admin/keys', {
+      const data = await safeFetchJSON('/api/admin/keys', {
         method: 'POST',
         headers: getAIHeaders(),
         body: JSON.stringify({ action: 'bulk', entries }),
       });
-      const data = await res.json();
       if (data.success) {
         setSaveSuccessMsg(`${entries.length} AI Provider Keys Saved in App & Device!`);
         setTimeout(() => setSaveSuccessMsg(null), 3500);
@@ -372,13 +390,19 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
     const keyToTest = candidateInput || storedCandidate || undefined;
 
     try {
-      const res = await fetch('/api/admin/test-provider', {
+      const data = await safeFetchJSON('/api/admin/test-provider', {
         method: 'POST',
         headers: getAIHeaders(),
         body: JSON.stringify({ provider: providerId, key: keyToTest }),
       });
-      const data = await res.json();
-      setTestResults((prev) => ({ ...prev, [providerId]: data }));
+      setTestResults((prev) => ({
+        ...prev,
+        [providerId]: {
+          success: Boolean(data.success),
+          message: data.message || (data.success ? 'Connected successfully' : (data.error || 'Connection failed')),
+          latencyMs: data.latencyMs,
+        },
+      }));
     } catch (err: any) {
       setTestResults((prev) => ({
         ...prev,
@@ -405,12 +429,11 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
 
   const handleToggleKey = async (id: string) => {
     try {
-      const res = await fetch('/api/admin/keys', {
+      const data = await safeFetchJSON('/api/admin/keys', {
         method: 'POST',
         headers: getAIHeaders(),
         body: JSON.stringify({ action: 'toggle', id }),
       });
-      const data = await res.json();
       if (data.stats) {
         setAdminStats(data.stats);
       } else {
@@ -429,12 +452,11 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
     }
 
     try {
-      const res = await fetch('/api/admin/keys', {
+      const data = await safeFetchJSON('/api/admin/keys', {
         method: 'POST',
         headers: getAIHeaders(),
         body: JSON.stringify({ action: 'delete', id }),
       });
-      const data = await res.json();
       if (data.stats) {
         setAdminStats(data.stats);
       } else {
@@ -473,12 +495,11 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
     }
 
     try {
-      const res = await fetch('/api/admin/family-bundle', {
+      const data = await safeFetchJSON('/api/admin/family-bundle', {
         method: 'POST',
         headers: getAIHeaders(),
         body: JSON.stringify({ action: 'import', bundle: inputVal }),
       });
-      const data = await res.json();
       if (data.success) {
         setFamilyCodeMsg(`Successfully imported ${data.count} provider API keys for your family!`);
         setFamilyCodeInput('');
@@ -495,12 +516,11 @@ export const AdminPanel: React.FC<Props> = ({ onClose, isHindi = true, onOpenSha
   const handleSavePrompts = async () => {
     if (!prompts) return;
     try {
-      const res = await fetch('/api/admin/prompts', {
+      const data = await safeFetchJSON('/api/admin/prompts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompts }),
       });
-      const data = await res.json();
       if (data.success) {
         setPromptSaveMsg('Prompts updated successfully! Source Lock remains permanent.');
         setTimeout(() => setPromptSaveMsg(null), 3500);

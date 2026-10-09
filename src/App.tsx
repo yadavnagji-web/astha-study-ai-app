@@ -146,6 +146,7 @@ export default function App() {
           }}
           currentView={currentView}
           onOpenShare={() => setIsShareOpen(true)}
+          onOpenUpload={() => setIsUploadOpen(true)}
         />
         {/* VIEW 1: Home */}
         {currentView === 'home' && (

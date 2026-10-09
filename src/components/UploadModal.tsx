@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Chapter, ClassLevel, Subject } from '../types';
 import { detectLanguage } from '../utils/language';
-import { getAIHeaders } from '../utils/aiClient';
+import { getAIHeaders, safeFetchJSON } from '../utils/aiClient';
 import {
   UploadCloud,
   FileText,
@@ -14,8 +14,6 @@ import {
   RotateCcw,
   Save,
   BookOpen,
-  Zap,
-  Sparkles,
 } from 'lucide-react';
 
 interface Props {
@@ -40,6 +38,7 @@ export const UploadModal: React.FC<Props> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState<string>('');
   const [extractedText, setExtractedText] = useState<string>('');
+  const [pastedText, setPastedText] = useState<string>('');
   const [isEditing, setIsEditing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -58,9 +57,24 @@ export const UploadModal: React.FC<Props> = ({
     setIsProcessing(false);
     setProcessingStatus('');
     setExtractedText('');
+    setPastedText('');
     setIsEditing(false);
     setErrorMessage(null);
     setChapterTitle('');
+  };
+
+  const handleUsePastedText = () => {
+    const trimmed = pastedText.trim();
+    if (!trimmed) {
+      setErrorMessage(isHindi ? 'कृपया पहले कुछ टेक्स्ट दर्ज करें।' : 'Please enter some text first.');
+      return;
+    }
+    setExtractedText(trimmed);
+    setChapterLanguage(detectLanguage(trimmed));
+    if (!chapterTitle) {
+      setChapterTitle(isHindi ? 'पेस्ट किया गया अध्याय' : 'Pasted Chapter');
+    }
+    setErrorMessage(null);
   };
 
   const handleDrag = (e: React.DragEvent) => {
@@ -86,12 +100,15 @@ export const UploadModal: React.FC<Props> = ({
     if (e.target.files && e.target.files[0]) {
       handleFileSelected(e.target.files[0]);
     }
+    // Clear value so re-selecting the same file triggers onChange
+    e.target.value = '';
   };
 
   const handleFileSelected = (file: File) => {
-    // Validate file type
-    const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg'];
-    if (!validTypes.includes(file.type)) {
+    // Validate file type (by both MIME type and file extension)
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp)$/i.test(file.name);
+    if (!isPdf && !isImg) {
       setErrorMessage(
         isHindi
           ? 'अमान्य फ़ाइल प्रकार! कृपया केवल PDF, PNG, या JPG फ़ाइल अपलोड करें।'
@@ -128,7 +145,7 @@ export const UploadModal: React.FC<Props> = ({
     setExtractedText('');
 
     try {
-      const isPDF = file.type === 'application/pdf';
+      const isPDF = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
 
       if (isPDF) {
         setProcessingStatus(isHindi ? 'PDF की जाँच कर रहे हैं...' : 'Checking PDF selectable text...');
@@ -142,15 +159,13 @@ export const UploadModal: React.FC<Props> = ({
         reader.readAsDataURL(file);
         const dataUrl = await base64Promise;
 
-        // Call backend PDF extractor
+        // Call backend PDF extractor safely
         setProcessingStatus(isHindi ? 'पेज 1 से 10 तक टेक्स्ट निकाला जा रहा है...' : 'Extracting text directly from PDF...');
-        const response = await fetch('/api/pdf/extract', {
+        const data = await safeFetchJSON('/api/pdf/extract', {
           method: 'POST',
           headers: getAIHeaders(),
           body: JSON.stringify({ base64: dataUrl }),
         });
-
-        const data = await response.json();
 
         if (data.success && data.hasSelectableText && data.text) {
           setExtractedText(data.text);
@@ -167,8 +182,8 @@ export const UploadModal: React.FC<Props> = ({
             : 'Scanned PDF detected. Running high-precision OCR...'
         );
 
-        // Fallback OCR on the first page/image
-        const ocrRes = await fetch('/api/ai/ocr', {
+        // Fallback OCR
+        const ocrData = await safeFetchJSON('/api/ai/ocr', {
           method: 'POST',
           headers: getAIHeaders(),
           body: JSON.stringify({
@@ -177,7 +192,6 @@ export const UploadModal: React.FC<Props> = ({
           }),
         });
 
-        const ocrData = await ocrRes.json();
         if (ocrData.success && ocrData.text) {
           setExtractedText(ocrData.text);
           setChapterLanguage(detectLanguage(ocrData.text));
@@ -186,7 +200,7 @@ export const UploadModal: React.FC<Props> = ({
         }
       } else {
         // Image OCR (PNG/JPG)
-        setProcessingStatus(isHindi ? 'चित्र का OCR विश्लेषण हो रहा है (Processing page 1)...' : 'Processing page 1 of 1 via OCR...');
+        setProcessingStatus(isHindi ? 'चित्र का OCR विश्लेषण हो रहा है...' : 'Processing image via OCR...');
 
         const reader = new FileReader();
         const base64Promise = new Promise<string>((resolve, reject) => {
@@ -196,16 +210,15 @@ export const UploadModal: React.FC<Props> = ({
         reader.readAsDataURL(file);
         const dataUrl = await base64Promise;
 
-        const ocrRes = await fetch('/api/ai/ocr', {
+        const ocrData = await safeFetchJSON('/api/ai/ocr', {
           method: 'POST',
           headers: getAIHeaders(),
           body: JSON.stringify({
             base64: dataUrl,
-            mimeType: file.type,
+            mimeType: file.type || 'image/jpeg',
           }),
         });
 
-        const ocrData = await ocrRes.json();
         if (ocrData.success && ocrData.text) {
           setExtractedText(ocrData.text);
           setChapterLanguage(detectLanguage(ocrData.text));
@@ -216,92 +229,12 @@ export const UploadModal: React.FC<Props> = ({
     } catch (err: any) {
       setErrorMessage(
         isHindi
-          ? `टेक्स्ट निकालने में समस्या: ${err.message || 'कृपया फ़ाइल पुनः जाँचें या दूसरी अपलोड करें'}`
-          : `Extraction error: ${err.message || 'Please check file and try again'}`
+          ? `टेक्स्ट निकालने में समस्या: ${err.message || 'कृपया फ़ाइल पुनः जाँचें या नीचे सीधा टेक्स्ट पेस्ट करें'}`
+          : `Extraction error: ${err.message || 'Please check file or paste text directly below'}`
       );
     } finally {
       setIsProcessing(false);
       setProcessingStatus('');
-    }
-  };
-
-  // Full Automatic Processing State
-  const [isAutoProcessing, setIsAutoProcessing] = useState(false);
-  const [autoProcessStage, setAutoProcessStage] = useState('');
-  const [autoProcessProgress, setAutoProcessProgress] = useState(0);
-
-  const handleSaveAndAutoProcess = async () => {
-    if (!extractedText.trim()) {
-      setErrorMessage(isHindi ? 'कृपया पहले अध्याय का टेक्स्ट निकालें।' : 'Please extract text first.');
-      return;
-    }
-
-    const titleToUse = chapterTitle.trim() || `अध्याय ${Date.now().toString().slice(-4)}`;
-    setIsAutoProcessing(true);
-    setErrorMessage(null);
-    setAutoProcessProgress(20);
-    setAutoProcessStage(isHindi ? '1/3: भाषा अनुवाद तैयार हो रहा है...' : '1/3: Translating chapter...');
-
-    try {
-      const res = await fetch('/api/ai/auto-process', {
-        method: 'POST',
-        headers: getAIHeaders(),
-        body: JSON.stringify({
-          text: extractedText.trim(),
-          language: chapterLanguage,
-        }),
-      });
-
-      setAutoProcessProgress(65);
-      setAutoProcessStage(isHindi ? '2/3: मुख्य नोट्स व सारांश बन रहे हैं...' : '2/3: Generating high-yield notes...');
-
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Auto process failed');
-      }
-
-      setAutoProcessProgress(90);
-      setAutoProcessStage(isHindi ? '3/3: 25+ अभ्यास प्रश्न और क्विज़ तैयार हो रहे हैं...' : '3/3: Finalizing question bank...');
-
-      const newChapter: Chapter = {
-        id: `chapter-${Date.now()}`,
-        title: titleToUse,
-        classLevel: chapterClass,
-        subject: chapterSubject,
-        language: chapterLanguage,
-        uploadedAt: new Date().toISOString(),
-        originalText: extractedText.trim(),
-        hindiTranslation: data.hindiTranslation || undefined,
-        englishTranslation: data.englishTranslation || undefined,
-        shortNotesHindi: data.shortNotesHindi || undefined,
-        shortNotesEnglish: data.shortNotesEnglish || undefined,
-        questions: (data.questions && data.questions.length > 0) ? data.questions : [],
-      };
-
-      setAutoProcessProgress(100);
-      setAutoProcessStage(isHindi ? '✅ 100% स्वतः तैयार हो गया!' : '✅ 100% Ready!');
-
-      setTimeout(() => {
-        onChapterSaved(newChapter);
-        onClose();
-        resetState();
-      }, 600);
-    } catch (err: any) {
-      // If auto-process encountered error, still save the chapter with text so work is not lost
-      const fallbackChapter: Chapter = {
-        id: `chapter-${Date.now()}`,
-        title: titleToUse,
-        classLevel: chapterClass,
-        subject: chapterSubject,
-        language: chapterLanguage,
-        uploadedAt: new Date().toISOString(),
-        originalText: extractedText.trim(),
-      };
-      onChapterSaved(fallbackChapter);
-      onClose();
-      resetState();
-    } finally {
-      setIsAutoProcessing(false);
     }
   };
 
@@ -398,35 +331,41 @@ export const UploadModal: React.FC<Props> = ({
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`relative flex flex-col items-center justify-center rounded-3xl border-2 border-dashed p-8 sm:p-12 text-center transition-all cursor-pointer ${
+              className={`relative flex flex-col items-center justify-center rounded-3xl border-2 border-dashed p-8 sm:p-12 text-center transition-all cursor-pointer overflow-hidden ${
                 dragActive
                   ? 'border-indigo-600 bg-indigo-50/80 scale-[1.01]'
                   : 'border-slate-300 bg-slate-50/60 hover:border-indigo-400 hover:bg-indigo-50/30'
               }`}
             >
+              {/* Native Invisible Full-Area Input - 100% Guaranteed to open file picker on all phones & desktops */}
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".pdf,image/png,image/jpeg,image/jpg"
                 onChange={handleFileChange}
-                className="hidden"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30"
+                title={isHindi ? 'फ़ाइल चुनें (Choose File)' : 'Choose File'}
               />
 
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-indigo-100 text-indigo-600 mb-4 shadow-sm">
+              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-indigo-100 text-indigo-600 mb-4 shadow-sm pointer-events-none">
                 <UploadCloud className="w-8 h-8" />
               </div>
 
-              <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-1">
+              <h3 className="text-base sm:text-lg font-bold text-slate-800 mb-1 pointer-events-none">
                 {isHindi ? 'यहाँ क्लिक करें या फ़ाइल ड्रैग करें' : 'Click to select or drag & drop chapter file'}
               </h3>
-              <p className="text-xs text-slate-500 max-w-sm mb-3">
+              <p className="text-xs text-slate-500 max-w-sm mb-3 pointer-events-none">
                 {isHindi
                   ? 'अपनी NCERT किताब का PDF या पेज की फ़ोटो (PNG, JPG) चुनें'
                   : 'Upload your NCERT textbook PDF or chapter page photo'}
               </p>
 
-              <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
+              <div className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-xs sm:text-sm font-extrabold text-white shadow-md shadow-indigo-600/30 mb-3 pointer-events-none">
+                <UploadCloud className="w-4 h-4" />
+                <span>{isHindi ? '📁 अपने डिवाइस से फ़ाइल चुनें (Choose File)' : '📁 Choose File from Device'}</span>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 pointer-events-none">
                 <span className="rounded-md bg-white border border-slate-200 px-2 py-0.5">PDF</span>
                 <span className="rounded-md bg-white border border-slate-200 px-2 py-0.5">PNG</span>
                 <span className="rounded-md bg-white border border-slate-200 px-2 py-0.5">JPG / JPEG</span>
@@ -434,49 +373,55 @@ export const UploadModal: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Processing Spinner & Status */}
-          {isProcessing && (
-            <div className="flex flex-col items-center justify-center rounded-2xl bg-indigo-50/80 p-8 border border-indigo-100 text-center animate-pulse">
-              <Loader2 className="w-10 h-10 text-indigo-600 animate-spin mb-3" />
-              <h4 className="font-bold text-slate-800 text-sm sm:text-base">
-                {processingStatus || (isHindi ? 'अध्याय प्रोसेस हो रहा है...' : 'Processing chapter...')}
-              </h4>
-              <p className="text-xs text-indigo-600 mt-1 font-medium">
-                {isHindi ? 'कृपया प्रतीक्षा करें, सामग्री निकाली जा रही है' : 'Extracting chapter content...'}
-              </p>
+          {/* Option 2: Direct Text Paste */}
+          {!extractedText && !isProcessing && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-extrabold text-slate-700 flex items-center gap-1.5">
+                  <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{isHindi ? '✍️ या सीधे अध्याय का टेक्स्ट यहाँ लिखें / पेस्ट करें:' : '✍️ Or Type / Paste Chapter Text Directly:'}</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {isHindi ? 'वैकल्पिक' : 'Optional'}
+                </span>
+              </div>
+              <textarea
+                rows={3}
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+                placeholder={
+                  isHindi
+                    ? 'यदि आपके पास PDF नहीं है, तो किताब का टेक्स्ट यहाँ कॉपी करके पेस्ट करें...'
+                    : 'Paste raw chapter text directly here if you do not have a PDF file...'
+                }
+                className="w-full rounded-xl border border-slate-200 p-3 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono"
+              />
+              {pastedText.trim().length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleUsePastedText}
+                  className="w-full rounded-xl bg-indigo-600 py-2.5 px-3 text-xs font-extrabold text-white hover:bg-indigo-700 active:scale-98 transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>{isHindi ? '✅ इस टेक्स्ट का उपयोग करें (Use This Text)' : '✅ Use This Text'}</span>
+                </button>
+              )}
             </div>
           )}
 
-          {/* Full Automatic AI Pipeline Active Screen */}
-          {isAutoProcessing && (
-            <div className="flex flex-col items-center justify-center rounded-3xl bg-gradient-to-b from-indigo-50/90 via-purple-50/80 to-white p-6 sm:p-8 border border-indigo-200 text-center shadow-lg">
-              <div className="relative mb-4">
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/30">
-                  <Zap className="w-7 h-7 fill-white animate-bounce" />
-                </div>
-                <Sparkles className="w-5 h-5 text-amber-500 absolute -top-1 -right-1 animate-spin" />
+          {/* Processing Spinner & Status */}
+          {isProcessing && (
+            <div className="flex flex-col items-center justify-center rounded-3xl bg-gradient-to-b from-indigo-50/90 to-white p-8 sm:p-10 border border-indigo-200 text-center shadow-sm">
+              <div className="relative mb-3.5">
+                <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+                <div className="absolute inset-0 rounded-full blur-md bg-indigo-400/25 animate-pulse pointer-events-none" />
               </div>
-
-              <h4 className="font-extrabold text-slate-900 text-base sm:text-lg mb-1">
-                {isHindi ? '⚡ पूर्ण स्वचालित AI निर्माण जारी है...' : '⚡ Full Automatic AI Pipeline Running...'}
+              <h4 className="font-extrabold text-slate-800 text-base sm:text-lg">
+                {processingStatus || (isHindi ? 'अध्याय प्रोसेस हो रहा है...' : 'Processing chapter...')}
               </h4>
-              <p className="text-xs font-semibold text-indigo-700 mb-4">
-                {autoProcessStage}
+              <p className="text-xs text-indigo-700 mt-1 font-medium max-w-sm">
+                {isHindi ? 'सामग्री का सटीक विश्लेषण हो रहा है, कृपया कुछ सेकंड प्रतीक्षा करें...' : 'Analyzing content, please wait a moment...'}
               </p>
-
-              {/* Progress Bar */}
-              <div className="w-full max-w-md bg-slate-200 rounded-full h-3 overflow-hidden shadow-inner mb-3">
-                <div
-                  className="bg-gradient-to-r from-amber-500 via-indigo-600 to-emerald-500 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${autoProcessProgress}%` }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between w-full max-w-md text-[11px] font-bold text-slate-500 px-1">
-                <span>{isHindi ? '1. अनुवाद' : '1. Translate'}</span>
-                <span>{isHindi ? '2. परीक्षा नोट्स' : '2. Notes'}</span>
-                <span>{isHindi ? '3. 25+ प्रश्न व क्विज़' : '3. Quiz Bank'}</span>
-              </div>
             </div>
           )}
 
@@ -600,34 +545,13 @@ export const UploadModal: React.FC<Props> = ({
           </button>
 
           {extractedText ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={handleSaveChapter}
-                disabled={isAutoProcessing}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition active:scale-95 disabled:opacity-50"
-              >
-                <Save className="w-3.5 h-3.5 text-slate-500" />
-                <span>{isHindi ? 'केवल टेक्स्ट सहेजें' : 'Save Text Only'}</span>
-              </button>
-
-              <button
-                onClick={handleSaveAndAutoProcess}
-                disabled={isAutoProcessing}
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-indigo-600 to-purple-600 px-5 py-2.5 text-xs sm:text-sm font-extrabold text-white shadow-lg shadow-indigo-600/25 hover:from-amber-600 hover:to-indigo-700 active:scale-95 transition disabled:opacity-50"
-              >
-                {isAutoProcessing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>{isHindi ? 'स्वतः निर्माण जारी...' : 'Auto-Processing...'}</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-4 h-4 fill-white text-white" />
-                    <span>{isHindi ? '⚡ स्वतः सब कुछ बनाएं' : '⚡ Auto-Process Everything'}</span>
-                  </>
-                )}
-              </button>
-            </div>
+            <button
+              onClick={handleSaveChapter}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs sm:text-sm font-extrabold text-white shadow-md shadow-emerald-600/20 hover:bg-emerald-700 active:scale-95 transition"
+            >
+              <Save className="w-4 h-4" />
+              <span>{isHindi ? 'अध्याय सहेजें (Save Chapter)' : 'Save Chapter'}</span>
+            </button>
           ) : (
             <div className="text-xs text-slate-400 italic">
               {isHindi ? 'कृपया फ़ाइल चुनें' : 'Please choose a file'}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, ArrowRight } from 'lucide-react';
 
 interface Props {
@@ -14,33 +14,36 @@ const LOADING_STEPS = [
 ];
 
 export const SplashScreen: React.FC<Props> = ({ onFinish, isHindi = true }) => {
-  const [progress, setProgress] = useState(15);
+  const [progress, setProgress] = useState(20);
   const [stepIndex, setStepIndex] = useState(0);
   const [isFadingOut, setIsFadingOut] = useState(false);
 
+  const onFinishRef = useRef(onFinish);
+  onFinishRef.current = onFinish;
+
   useEffect(() => {
     const timer1 = setTimeout(() => {
-      setProgress(45);
+      setProgress(50);
       setStepIndex(1);
-    }, 300);
+    }, 350);
 
     const timer2 = setTimeout(() => {
-      setProgress(78);
+      setProgress(80);
       setStepIndex(2);
-    }, 650);
+    }, 750);
 
     const timer3 = setTimeout(() => {
       setProgress(100);
       setStepIndex(3);
-    }, 950);
+    }, 1100);
 
     const timer4 = setTimeout(() => {
       setIsFadingOut(true);
-    }, 1250);
+    }, 1400);
 
     const timer5 = setTimeout(() => {
-      onFinish();
-    }, 1550);
+      onFinishRef.current();
+    }, 1700);
 
     return () => {
       clearTimeout(timer1);
@@ -49,7 +52,7 @@ export const SplashScreen: React.FC<Props> = ({ onFinish, isHindi = true }) => {
       clearTimeout(timer4);
       clearTimeout(timer5);
     };
-  }, [onFinish]);
+  }, []); // Run strictly once on mount, immune to parent re-renders
 
   return (
     <div

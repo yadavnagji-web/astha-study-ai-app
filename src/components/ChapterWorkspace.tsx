@@ -9,7 +9,7 @@ import {
 } from '../types';
 import confetti from 'canvas-confetti';
 import { PrintableQuestionPaper } from './PrintableQuestionPaper';
-import { getAIHeaders } from '../utils/aiClient';
+import { getAIHeaders, safeFetchJSON } from '../utils/aiClient';
 import {
   BookOpen,
   Languages,
@@ -35,7 +35,6 @@ import {
   XCircle,
   Clock,
   ShieldCheck,
-  Zap,
 } from 'lucide-react';
 
 interface Props {
@@ -191,7 +190,7 @@ export const ChapterWorkspace: React.FC<Props> = ({
     setErrorMessage(null);
 
     try {
-      const res = await fetch('/api/ai/translate', {
+      const data = await safeFetchJSON('/api/ai/translate', {
         method: 'POST',
         headers: getAIHeaders(),
         body: JSON.stringify({
@@ -200,7 +199,6 @@ export const ChapterWorkspace: React.FC<Props> = ({
         }),
       });
 
-      const data = await res.json();
       if (!data.success) {
         throw new Error(data.error || 'Translation failed');
       }
@@ -226,7 +224,7 @@ export const ChapterWorkspace: React.FC<Props> = ({
     setErrorMessage(null);
 
     try {
-      const res = await fetch('/api/ai/summary', {
+      const data = await safeFetchJSON('/api/ai/summary', {
         method: 'POST',
         headers: getAIHeaders(),
         body: JSON.stringify({
@@ -235,7 +233,6 @@ export const ChapterWorkspace: React.FC<Props> = ({
         }),
       });
 
-      const data = await res.json();
       if (!data.success) {
         throw new Error(data.error || 'Failed to generate summary');
       }
@@ -261,7 +258,7 @@ export const ChapterWorkspace: React.FC<Props> = ({
     setErrorMessage(null);
 
     try {
-      const res = await fetch('/api/ai/questions', {
+      const data = await safeFetchJSON('/api/ai/questions', {
         method: 'POST',
         headers: getAIHeaders(),
         body: JSON.stringify({
@@ -271,7 +268,6 @@ export const ChapterWorkspace: React.FC<Props> = ({
         }),
       });
 
-      const data = await res.json();
       if (!data.success) {
         throw new Error(data.error || 'Failed to generate questions');
       }
@@ -287,62 +283,6 @@ export const ChapterWorkspace: React.FC<Props> = ({
       setErrorMessage(err.message || 'Question generation failed');
     } finally {
       setLoadingAction(null);
-    }
-  };
-
-  // ⚡ 1-Click Automatic Generation (Notes + Translation + Question Bank)
-  const [autoProcessStage, setAutoProcessStage] = useState<string>('');
-  const [autoProcessProgress, setAutoProcessProgress] = useState<number | null>(null);
-
-  const handleAutoProcessAll = async () => {
-    setLoadingAction('auto-process');
-    setErrorMessage(null);
-    setAutoProcessProgress(20);
-    setAutoProcessStage(isHindi ? '1/3: भाषा अनुवाद तैयार हो रहा है...' : '1/3: Translating chapter...');
-
-    try {
-      const res = await fetch('/api/ai/auto-process', {
-        method: 'POST',
-        headers: getAIHeaders(),
-        body: JSON.stringify({
-          text: chapter.originalText,
-          language: chapter.language,
-        }),
-      });
-
-      setAutoProcessProgress(65);
-      setAutoProcessStage(isHindi ? '2/3: मुख्य नोट्स व सारांश बन रहे हैं...' : '2/3: Generating high-yield notes...');
-
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Auto process failed');
-      }
-
-      setAutoProcessProgress(95);
-      setAutoProcessStage(isHindi ? '3/3: 25+ अभ्यास प्रश्न और क्विज़ तैयार हो रहे हैं...' : '3/3: Finalizing questions...');
-
-      const updated: Chapter = {
-        ...chapter,
-        hindiTranslation: data.hindiTranslation || chapter.hindiTranslation,
-        englishTranslation: data.englishTranslation || chapter.englishTranslation,
-        shortNotesHindi: data.shortNotesHindi || chapter.shortNotesHindi,
-        shortNotesEnglish: data.shortNotesEnglish || chapter.shortNotesEnglish,
-        questions: (data.questions && data.questions.length > 0) ? data.questions : chapter.questions,
-      };
-
-      setAutoProcessProgress(100);
-      setAutoProcessStage(isHindi ? '✅ सब कुछ स्वतः तैयार हो गया!' : '✅ Complete Chapter Ready!');
-
-      onUpdateChapter(updated);
-      confetti({ particleCount: 90, spread: 70, origin: { y: 0.6 } });
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Auto-process error');
-    } finally {
-      setTimeout(() => {
-        setLoadingAction(null);
-        setAutoProcessProgress(null);
-        setAutoProcessStage('');
-      }, 700);
     }
   };
 
@@ -498,58 +438,6 @@ export const ChapterWorkspace: React.FC<Props> = ({
           </div>
         )}
       </div>
-
-      {/* ⚡ Smart Auto-Pilot Banner (when notes or questions are not yet generated) */}
-      {(!chapter.shortNotesHindi || !chapter.shortNotesEnglish || !chapter.questions || chapter.questions.length === 0) && (
-        <div className="rounded-2xl bg-gradient-to-r from-amber-500 via-indigo-600 to-purple-600 p-0.5 shadow-md">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-[15px] bg-white p-3.5 sm:p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 text-white shadow-md shadow-indigo-600/20">
-                <Zap className="w-5 h-5 fill-white" />
-              </div>
-              <div>
-                <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                  <span>⚡ स्मार्ट ऑटो-पायलट (1-Click Auto Pilot)</span>
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-800">
-                    {isHindi ? 'स्वतः निर्माण' : 'Full Auto'}
-                  </span>
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  {isHindi
-                    ? 'एक क्लिक में नोट्स, भाषा अनुवाद और 25+ परीक्षा प्रश्न स्वतः तैयार करें।'
-                    : 'Generate complete notes, translation, and 25+ exam questions in one single tap.'}
-                </p>
-              </div>
-            </div>
-
-            <button
-              onClick={handleAutoProcessAll}
-              disabled={loadingAction === 'auto-process'}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-500 via-indigo-600 to-purple-600 px-5 py-2.5 text-xs sm:text-sm font-extrabold text-white shadow-md shadow-indigo-600/25 hover:from-amber-600 hover:to-indigo-700 active:scale-95 transition disabled:opacity-50"
-            >
-              {loadingAction === 'auto-process' ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{autoProcessStage || (isHindi ? 'स्वतः निर्माण जारी...' : 'Auto-generating...')}</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="w-4 h-4 fill-white text-white" />
-                  <span>{isHindi ? '⚡ सब कुछ स्वतः बनाएं' : '⚡ Auto-Generate All'}</span>
-                </>
-              )}
-            </button>
-          </div>
-          {loadingAction === 'auto-process' && autoProcessProgress !== null && (
-            <div className="w-full bg-slate-100 h-1.5 overflow-hidden rounded-b-[14px]">
-              <div
-                className="bg-gradient-to-r from-amber-400 to-emerald-400 h-full transition-all duration-300"
-                style={{ width: `${autoProcessProgress}%` }}
-              />
-            </div>
-          )}
-        </div>
-      )}
 
       {/* 100% Mobile Responsive Navigation Workspace Tabs Bar (NO Horizontal Scrollbar) */}
       <div className="space-y-2 w-full max-w-full">
